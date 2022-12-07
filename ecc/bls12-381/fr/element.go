@@ -876,6 +876,20 @@ func (z *Element) SetBytes(e []byte) *Element {
 	return z
 }
 
+func (z *Element) SetBytesReduced(e []byte) (*Element, error) {
+	// get a big int from our pool
+	vv := bigIntPool.Get().(*big.Int)
+	vv.SetBytes(e)
+
+	// set big int
+	_, err :=z.SetBigIntReduced(vv)
+
+	// put temporary object back in pool
+	bigIntPool.Put(vv)
+
+	return z, err
+}
+
 // SetBigInt sets z to v and returns z
 func (z *Element) SetBigInt(v *big.Int) *Element {
 	z.SetZero()
@@ -905,6 +919,24 @@ func (z *Element) SetBigInt(v *big.Int) *Element {
 	// release object into pool
 	bigIntPool.Put(vv)
 	return z
+}
+
+// SetBigInt sets z to v and returns z, if v is reduced
+func (z *Element) SetBigIntReduced(v *big.Int) (*Element, error) {
+	z.SetZero()
+
+	var zero big.Int
+
+	// fast path
+	c := v.Cmp(&_modulus)
+	if c == 0 {
+		// v == 0
+		return z, nil
+	} else if c != 1 && v.Cmp(&zero) != -1 {
+		// 0 < v < q
+		return z.setBigInt(v), nil
+	}
+	return nil, errors.New("bytes are non-canonical")
 }
 
 // setBigInt assumes 0 ⩽ v < q
